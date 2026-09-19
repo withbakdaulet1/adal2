@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  ADAL TARGET — Жиналыс кестесі (Supabase нұсқасы)
+  ============================================================================
+  Іске қосу алдында:
+  1. supabase.com — жаңа жоба жасаңыз (тегін жоспар жеткілікті)
+  2. Authentication → Providers → Email → "Confirm email" ӨШІРІҢІЗ
+     (ішкі команда құралы үшін email растау артық қадам)
+  3. SQL Editor-де README.md-дегі SQL-ды толық іске қосыңыз
+  4. Settings → API бөлімінен Project URL мен anon public key көшіріп алып,
+     төмендегі SUPABASE_URL / SUPABASE_ANON_KEY айнымалыларына қойыңыз
+  5. Бірінші рет тіркеліп кіріңіз → Supabase Table Editor-де users
+     кестесінен өз жолыңызды тауып, role бағанын 'midl'-дан 'rom' етіп
+     қолмен өзгертіңіз — сіз РОМ боласыз
+  ============================================================================
+-->
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ADAL TARGET — Жиналыс кестесі</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --accent:#1E3A5F;
+    --accent-2:#2D5A8C;
+    --green:#15803D;
+    --green-bg:#EFFCF3;
+    --red:#DC2626;
+    --red-bg:#FEF2F2;
+    --amber:#B45309;
+    --amber-bg:#FFF8EB;
+    --ink:#1F2937;
+    --ink-soft:#5B6470;
+    --line:#E4E7EC;
+    --line-soft:#EEF0F3;
+    --bg:#F7F8FA;
+    --card:#FFFFFF;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ink:#EDEFF2; --ink-soft:#9AA3AF; --bg:#0F1319; --card:#161B22;
+      --line:#262C36; --line-soft:#1D232C;
+      --green-bg:#0E2318; --red-bg:#2A1414; --amber-bg:#2A2010;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#EDEFF2; --ink-soft:#9AA3AF; --bg:#0F1319; --card:#161B22;
+    --line:#262C36; --line-soft:#1D232C;
+    --green-bg:#0E2318; --red-bg:#2A1414; --amber-bg:#2A2010;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Times New Roman', Georgia, serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
+  header.top{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    margin-bottom:22px; flex-wrap:wrap;
+  }
+  .brand small{
+    display:block; letter-spacing:.14em; text-transform:uppercase;
+    font-size:11px; color:var(--ink-soft); font-family:Georgia,serif; margin-bottom:4px;
+  }
+  .brand h1{margin:0; font-size:28px; font-weight:700; color:var(--accent); letter-spacing:-.01em;}
+  .datebar{display:flex; align-items:center; gap:10px;}
+  .datebar input[type=date]{
+    font-family:inherit; font-size:15px; padding:9px 12px; border-radius:9px;
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+  }
+  .datebar button{
+    font-family:inherit; font-size:14px; padding:9px 14px; border-radius:9px;
+    border:1px solid var(--line); background:var(--card); color:var(--ink-soft); cursor:pointer;
+  }
+  .datebar button:hover{border-color:var(--accent-2); color:var(--accent-2);}
+  .signout-btn{
+    font-family:inherit; font-size:13px; padding:8px 14px; border-radius:9px;
+    border:1px solid var(--line); background:var(--card); color:var(--ink-soft); cursor:pointer;
+  }
+  .signout-btn:hover{border-color:var(--red); color:var(--red);}
+
+  nav.tabs{display:flex; gap:6px; margin-bottom:20px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  nav.tabs button{
+    font-family:inherit; font-size:15px; padding:11px 18px; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  nav.tabs button.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:700;}
+
+  .role-banner{
+    font-family:Georgia,serif; font-size:13.5px; padding:10px 16px; border-radius:9px;
+    margin-bottom:16px; border:1px solid transparent;
+  }
+  .role-banner.interact{background:var(--line-soft); color:var(--ink-soft); border-color:var(--line);}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); overflow:hidden; margin-bottom:22px;
+  }
+  .card .head{
+    padding:16px 20px; border-bottom:1px solid var(--line-soft);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+  .card .head h2{margin:0; font-size:17px; color:var(--ink);}
+  .card .head .sub{font-size:13px; color:var(--ink-soft); font-family:Georgia,serif;}
+
+  .addproj{display:flex; gap:8px; padding:14px 20px; border-bottom:1px solid var(--line-soft); flex-wrap:wrap;}
+  .addproj input{
+    font-family:inherit; flex:1; min-width:160px; font-size:14px; padding:8px 11px;
+    border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink);
+  }
+  .addproj button{
+    font-family:inherit; font-size:14px; padding:8px 16px; border-radius:8px; border:none;
+    background:var(--accent); color:#fff; cursor:pointer; white-space:nowrap;
+  }
+  .addproj button:hover{background:var(--accent-2);}
+
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  thead th{
+    text-align:left; font-family:Georgia,serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-soft); padding:10px 14px; background:var(--line-soft); white-space:nowrap;
+  }
+  tbody td{padding:10px 14px; border-top:1px solid var(--line-soft); vertical-align:top;}
+  tbody tr:hover{background:var(--line-soft);}
+  td.proj{font-weight:700; color:var(--accent); white-space:nowrap;}
+  td input, td textarea{
+    font-family:inherit; width:100%; font-size:14px; padding:6px 9px; border-radius:7px;
+    border:1px solid var(--line); background:var(--bg); color:var(--ink);
+  }
+  td input[type=number]{text-align:right;}
+  td textarea{resize:vertical; min-height:38px; line-height:1.4;}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px;
+    font-size:12.5px; font-weight:700; white-space:nowrap;
+  }
+  .status-pill.green{background:var(--green-bg); color:var(--green);}
+  .status-pill.red{background:var(--red-bg); color:var(--red);}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .num{font-variant-numeric:tabular-nums;}
+  .del-row{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:18px; line-height:1; padding:4px;
+  }
+  .del-row:hover{color:var(--red);}
+  .empty-hint{padding:30px 20px; text-align:center; color:var(--ink-soft); font-size:14px;}
+
+  .totals-row td{background:var(--line-soft); font-weight:700; border-top:2px solid var(--line);}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; padding:18px 20px;}
+  .kpi{background:var(--bg); border:1px solid var(--line-soft); border-radius:10px; padding:14px 16px;}
+  .kpi .label{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); font-family:Georgia,serif; margin-bottom:6px;}
+  .kpi .value{font-size:22px; font-weight:700; color:var(--ink);}
+  .kpi .value.green{color:var(--green);}
+  .kpi .value.red{color:var(--red);}
+
+  select.month-select{
+    font-family:inherit; font-size:14px; padding:8px 12px; border-radius:8px;
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+  }
+
+  .save-note{font-size:12px; color:var(--ink-soft); padding:10px 20px 4px; font-family:Georgia,serif;}
+  .save-note.saving{color:var(--amber);}
+  .save-note.saved{color:var(--green);}
+
+  footer.foot{text-align:center; font-size:12px; color:var(--ink-soft); padding:30px 0 10px; font-family:Georgia,serif;}
+
+  /* ---------- auth screen ---------- */
+  .auth-wrap{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-card{
+    width:100%; max-width:360px; background:var(--card); border:1px solid var(--line);
+    border-radius:16px; box-shadow:var(--shadow); padding:32px 28px;
+  }
+  .auth-card h1{margin:0 0 6px; font-size:22px; color:var(--accent); text-align:center;}
+  .auth-card .sub{text-align:center; color:var(--ink-soft); font-size:13px; margin-bottom:24px; font-family:Georgia,serif;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px; font-family:Georgia,serif;}
+  .auth-field input{
+    width:100%; font-family:inherit; font-size:15px; padding:10px 12px; border-radius:9px;
+    border:1px solid var(--line); background:var(--bg); color:var(--ink);
+  }
+  .auth-submit{
+    width:100%; font-family:inherit; font-size:15px; font-weight:700; padding:11px; border-radius:9px;
+    border:none; background:var(--accent); color:#fff; cursor:pointer; margin-top:6px;
+  }
+  .auth-submit:hover{background:var(--accent-2);}
+  .auth-toggle{
+    text-align:center; margin-top:16px; font-size:13px; color:var(--ink-soft);
+  }
+  .auth-toggle a{color:var(--accent-2); cursor:pointer; text-decoration:underline;}
+  .auth-msg{
+    font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:14px; display:none;
+  }
+  .auth-msg.error{background:var(--red-bg); color:var(--red); display:block;}
+  .auth-msg.ok{background:var(--green-bg); color:var(--green); display:block;}
+
+  @media(max-width:640px){
+    .wrap{padding:18px 12px 60px;}
+    .brand h1{font-size:22px;}
+    table{font-size:13px;}
+    thead th, tbody td{padding:8px 10px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div class="auth-wrap" id="authScreen">
+  <div class="auth-card">
+    <h1>ADAL TARGET</h1>
+    <div class="sub" id="authSubtitle">Жиналыс кестесіне кіру</div>
+    <div class="auth-msg" id="authMsg"></div>
+
+    <div class="auth-field" id="nameField" style="display:none;">
+      <label>Атыңыз</label>
+      <input type="text" id="authName" placeholder="Аты-жөніңіз" autocomplete="name">
+    </div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label>Құпия сөз</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="auth-submit" id="authSubmitBtn">Кіру</button>
+    <div class="auth-toggle" id="authToggle">
+      Аккаунтыңыз жоқ па? <a id="authToggleLink">Тіркелу</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="wrap" id="mainContent" style="display:none;">
+
+  <header class="top">
+    <div class="brand">
+      <small>ADAL TARGET</small>
+      <h1>Жиналыс кестесі</h1>
+    </div>
+    <div class="datebar">
+      <button id="prevDay">←</button>
+      <input type="date" id="dayPicker">
+      <button id="nextDay">→</button>
+      <button id="todayBtn">Бүгін</button>
+      <button class="signout-btn" id="signOutBtn">Шығу</button>
+    </div>
+  </header>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="daily">Күндік</button>
+    <button class="tab-btn" data-tab="monthly">Айлық жиынтық</button>
+    <button class="tab-btn" data-tab="plans">Жоспарлар</button>
+    <button class="tab-btn" data-tab="manage" id="manageTabBtn">Проекттер</button>
+  </nav>
+
+  <!-- ============ DAILY TAB ============ -->
+  <section id="tab-daily">
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2 id="dailyDateTitle">—</h2>
+          <div class="sub">Жоспар — «Жоспарлар» бетінде ай сайын РОМ орнатады, күнге автоматты бөлінеді.</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="dailyTable">
+          <thead>
+            <tr>
+              <th style="min-width:130px;">Проект</th>
+              <th style="min-width:110px;">Түсім (тг)</th>
+              <th style="min-width:110px;">Шығын (тг)</th>
+              <th style="min-width:120px;">Таза пайда (тг)</th>
+              <th style="min-width:120px;">Күндік мақсат</th>
+              <th style="min-width:90px;">Статус</th>
+              <th style="min-width:220px;">Мәселе / Ұсыныс</th>
+              <th style="width:30px;"></th>
+            </tr>
+          </thead>
+          <tbody id="dailyBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-hint" id="dailyEmptyHint" style="display:none;">Әзірше проект қосылмаған. «Проекттер» бетінен қосыңыз.</div>
+      <div class="save-note" id="saveNote">&nbsp;</div>
+    </div>
+    <div class="card">
+      <div class="head"><h2>Бүгінгі жиынтық</h2></div>
+      <div class="kpi-grid" id="dailyKpis"></div>
+    </div>
+  </section>
+
+  <!-- ============ MONTHLY TAB ============ -->
+  <section id="tab-monthly" style="display:none;">
+    <div class="card">
+      <div class="head">
+        <h2>Айлық жиынтық</h2>
+        <select class="month-select" id="monthPicker"></select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="monthlyTable">
+          <thead>
+            <tr>
+              <th style="min-width:130px;">Проект</th>
+              <th style="min-width:120px;">Жалпы түсім</th>
+              <th style="min-width:120px;">Жалпы шығын</th>
+              <th style="min-width:130px;">Жалпы таза пайда</th>
+              <th style="min-width:130px;">Айлық жоспар</th>
+              <th style="min-width:100px;">Орындалу</th>
+            </tr>
+          </thead>
+          <tbody id="monthlyBody"></tbody>
+          <tfoot id="monthlyFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="head"><h2>Барлық проекттер бойынша общий нәтиже</h2></div>
+      <div class="kpi-grid" id="monthlyKpis"></div>
+    </div>
+  </section>
+
+  <!-- ============ PLANS TAB ============ -->
+  <section id="tab-plans" style="display:none;">
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Айлық жоспарлар</h2>
+          <div class="sub">Әр проектке, әр айға бөлек орнатылады.</div>
+        </div>
+        <select class="month-select" id="plansMonthPicker"></select>
+      </div>
+      <div id="plansNoPermNote" class="empty-hint" style="display:none; padding:14px 20px; text-align:left; border-bottom:1px solid var(--line-soft);">
+        Жоспарды тек РОМ өзгерте алады.
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="plansTable">
+          <thead>
+            <tr>
+              <th style="min-width:180px;">Проект</th>
+              <th style="min-width:160px;">Айлық жоспар (тг)</th>
+              <th style="min-width:160px;">Күндік мақсат (авто)</th>
+            </tr>
+          </thead>
+          <tbody id="plansBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-hint" id="plansEmptyHint" style="display:none;">Әзірше проект жоқ.</div>
+    </div>
+  </section>
+
+  <!-- ============ MANAGE / PROJECTS + ROLES TAB (РОМ-ға ғана) ============ -->
+  <section id="tab-manage" style="display:none;">
+    <div class="card">
+      <div class="head"><h2>Проекттерді басқару</h2></div>
+      <div class="addproj">
+        <input type="text" id="newProjName" placeholder="Жаңа проект атауы">
+        <button id="addProjBtn">+ Қосу</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Проект атауы</th><th style="width:60px;"></th></tr></thead>
+          <tbody id="manageBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-hint" id="manageEmptyHint" style="display:none;">Әзірше проект жоқ.</div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Пайдаланушылар мен рөлдер</h2>
+          <div class="sub">Тіркелген әрбір адам әдепкі бойынша «Мидл» болады. РОМ-ды осы жерден тағайындайсыз.</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Аты / Email</th><th style="min-width:150px;">Рөлі</th><th style="width:100px;"></th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-hint" id="usersEmptyHint" style="display:none;">Әзірше ешкім тіркелмеген.</div>
+    </div>
+  </section>
+
+  <footer class="foot">ADAL TARGET · Маркетинг бөлімі · Регламент 1.0</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ==========================================================================
+  // 1) SUPABASE КОНФИГУРАЦИЯСЫ — осы екеуін өз жобаңыздан қойыңыз
+  // ==========================================================================
+  const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ==========================================================================
+  // HELPERS
+  // ==========================================================================
+  const fmtMoney = n => (Math.round(Number(n)||0)).toLocaleString('ru-RU');
+  const fmtTarget = n => {
+    const v = Number(n)||0;
+    if (!v) return '—';
+    return v.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' тг';
+  };
+  const todayISO = () => {
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  };
+  function isoToParts(iso){ const [y,m,d] = iso.split('-').map(Number); return {y,m,d}; }
+  function addDays(iso, delta){
+    const {y,m,d} = isoToParts(iso);
+    const dt = new Date(Date.UTC(y, m-1, d));
+    dt.setUTCDate(dt.getUTCDate()+delta);
+    return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
+  }
+  function weekdayOf(iso){ const {y,m,d} = isoToParts(iso); return new Date(Date.UTC(y, m-1, d)).getUTCDay(); }
+  const monthKey = iso => iso ? iso.slice(0,7) : '';
+  const monthLabelsKz = ['Қаңтар','Ақпан','Наурыз','Сәуір','Мамыр','Маусым','Шілде','Тамыз','Қыркүйек','Қазан','Қараша','Желтоқсан'];
+  const monthLabel = key => { if(!key) return key; const [y,m] = key.split('-'); return monthLabelsKz[parseInt(m,10)-1] + ' ' + y; };
+  const FIXED_MONTHS = ['2026-09','2026-10','2026-11','2026-12','2027-01','2027-02','2027-03','2027-04','2027-05','2027-06','2027-07','2027-08','2027-09'];
+  function daysInMonth(mk){ const [y,m] = mk.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // ==========================================================================
+  // STATE
+  // ==========================================================================
+  let state = { projects: [], entries: {}, monthlyPlans: {} };
+  let currentDate = todayISO();
+  let session = null;
+  let myId = null;
+  let isAdmin = false;
+  let saveTimer = null;
+
+  // ==========================================================================
+  // AUTH
+  // ==========================================================================
+  let authMode = 'signin'; // 'signin' | 'signup'
+
+  function showAuthMsg(text, kind){
+    const el = document.getElementById('authMsg');
+    el.textContent = text;
+    el.className = 'auth-msg ' + kind;
+  }
+  function clearAuthMsg(){
+    const el = document.getElementById('authMsg');
+    el.className = 'auth-msg';
+    el.textContent = '';
+  }
+
+  function toggleAuthMode(){
+    authMode = authMode === 'signin' ? 'signup' : 'signin';
+    document.getElementById('nameField').style.display = authMode === 'signup' ? '' : 'none';
+    document.getElementById('authSubmitBtn').textContent = authMode === 'signup' ? 'Тіркелу' : 'Кіру';
+    document.getElementById('authSubtitle').textContent = authMode === 'signup' ? 'Жаңа аккаунт тіркеу' : 'Жиналыс кестесіне кіру';
+    const toggleEl = document.getElementById('authToggle');
+    toggleEl.innerHTML = authMode === 'signup'
+      ? 'Аккаунтыңыз бар ма? <a id="authToggleLink">Кіру</a>'
+      : 'Аккаунтыңыз жоқ па? <a id="authToggleLink">Тіркелу</a>';
+    // innerHTML ауыстырғаннан кейін ескі event listener жойылады — қайта тіркейміз
+    document.getElementById('authToggleLink').addEventListener('click', toggleAuthMode);
+    clearAuthMsg();
+  }
+  document.getElementById('authToggleLink').addEventListener('click', toggleAuthMode);
+
+  document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
+    clearAuthMsg();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const name = document.getElementById('authName').value.trim();
+    if (!email || !password){ showAuthMsg('Email мен құпия сөзді толтырыңыз', 'error'); return; }
+
+    if (authMode === 'signup'){
+      const { data, error } = await supabase.auth.signUp({
+        email, password, options: { data: { name: name || email.split('@')[0] } }
+      });
+      if (error){ showAuthMsg(error.message, 'error'); return; }
+      if (!data.session){
+        showAuthMsg('Тіркелу сәтті өтті. Email-ді растау қажет болуы мүмкін — растаудан кейін кіріңіз.', 'ok');
+        return;
+      }
+      await onSignedIn(data.session);
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error){ showAuthMsg(error.message, 'error'); return; }
+      await onSignedIn(data.session);
+    }
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', async ()=>{
+    await supabase.auth.signOut();
+    location.reload();
+  });
+
+  async function onSignedIn(sess){
+    session = sess;
+    myId = sess.user.id;
+
+    // Бірінші кіру болса — users кестесіне жол жасаймыз, әдепкі рөл 'midl'.
+    // Бар болса — қайта жазбаймыз (рөлді қайта орнатып жіберіп алмау үшін).
+    let { data: existing } = await supabase.from('users').select('*').eq('id', myId).maybeSingle();
+    if (!existing){
+      const name = sess.user.user_metadata?.name || sess.user.email.split('@')[0];
+      const { data: inserted } = await supabase.from('users')
+        .insert({ id: myId, email: sess.user.email, name, role: 'midl' })
+        .select().maybeSingle();
+      existing = inserted || { id: myId, email: sess.user.email, name, role: 'midl' };
+    }
+    isAdmin = existing.role === 'rom';
+
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainContent').style.display = '';
+
+    await loadAll();
+    if (isAdmin && state.projects.length === 0){
+      await addProject('Түркістан тұғыры');
+      await addProject('Тамшы нұры');
+    }
+    renderRoleBanner();
+    renderDaily();
+  }
+
+  // Парақ ашылғанда бар сессияны тексереміз
+  (async function initAuth(){
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    if (existingSession){
+      await onSignedIn(existingSession);
+    }
+  })();
+
+  function renderRoleBanner(){
+    const el = document.getElementById('roleBanner');
+    const manageTab = document.getElementById('manageTabBtn');
+    if (manageTab) manageTab.style.display = isAdmin ? '' : 'none';
+    if (!el) return;
+    el.style.display = isAdmin ? 'none' : '';
+    el.className = 'role-banner interact';
+    el.textContent = '✏️ Күндік деректі толтыра аласыз.';
+  }
+
+  // ==========================================================================
+  // DATA — Supabase Postgres
+  // ==========================================================================
+  async function loadAll(){
+    const [{ data: projects }, { data: entries }, { data: plans }] = await Promise.all([
+      supabase.from('projects').select('*').order('created_at', { ascending: true }),
+      supabase.from('entries').select('*'),
+      supabase.from('monthly_plans').select('*'),
+    ]);
+
+    state.projects = (projects || []).map(p => ({ id: p.id, name: p.name }));
+
+    state.entries = {};
+    (entries || []).forEach(e => {
+      state.entries[e.date + '__' + e.project_id] = { revenue: e.revenue, cost: e.cost, problem: e.problem };
+    });
+
+    state.monthlyPlans = {};
+    (plans || []).forEach(p => {
+      state.monthlyPlans[p.month_key + '__' + p.project_id] = Number(p.plan) || 0;
+    });
+  }
+
+  function getMonthlyPlan(mk, projectId){ return Number(state.monthlyPlans[mk+'__'+projectId]) || 0; }
+
+  async function setMonthlyPlan(mk, projectId, value){
+    if (!isAdmin) return;
+    const num = Number(value)||0;
+    state.monthlyPlans[mk+'__'+projectId] = num;
+    await supabase.from('monthly_plans').upsert(
+      { month_key: mk, project_id: projectId, plan: num },
+      { onConflict: 'month_key,project_id' }
+    );
+  }
+
+  function markSaving(){ const el = document.getElementById('saveNote'); el.textContent='Сақталуда…'; el.className='save-note saving'; }
+  function markSaved(){
+    const el = document.getElementById('saveNote'); el.textContent='Сақталды ✓'; el.className='save-note saved';
+    setTimeout(()=>{ if(el.className==='save-note saved'){ el.textContent='\u00A0'; el.className='save-note'; } }, 1800);
+  }
+
+  async function saveEntry(key, data){
+    state.entries[key] = data;
+    markSaving();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async ()=>{
+      const [date, projectId] = key.split('__');
+      await supabase.from('entries').upsert(
+        { date, project_id: projectId, revenue: Number(data.revenue)||0, cost: Number(data.cost)||0, problem: data.problem||'' },
+        { onConflict: 'date,project_id' }
+      );
+      markSaved();
+    }, 500);
+  }
+
+  async function addProject(name){
+    if (!isAdmin) return null;
+    const { data, error } = await supabase.from('projects').insert({ name }).select().maybeSingle();
+    if (error || !data) return null;
+    state.projects.push({ id: data.id, name: data.name });
+    return data.id;
+  }
+
+  async function deleteProject(id){
+    if (!isAdmin) return;
+    await supabase.from('projects').delete().eq('id', id);
+    state.projects = state.projects.filter(p => p.id !== id);
+    Object.keys(state.entries).forEach(k => { if (k.endsWith('__'+id)) delete state.entries[k]; });
+  }
+
+  async function setUserRole(id, role){
+    if (!isAdmin) return;
+    await supabase.from('users').update({ role }).eq('id', id);
+  }
+
+  // ==========================================================================
+  // DATE NAV
+  // ==========================================================================
+  const dayPicker = document.getElementById('dayPicker');
+  dayPicker.value = currentDate;
+  function setDate(iso){ currentDate = iso; dayPicker.value = iso; renderDaily(); }
+  document.getElementById('prevDay').addEventListener('click', ()=> setDate(addDays(currentDate, -1)));
+  document.getElementById('nextDay').addEventListener('click', ()=> setDate(addDays(currentDate, 1)));
+  document.getElementById('todayBtn').addEventListener('click', ()=> setDate(todayISO()));
+  dayPicker.addEventListener('change', ()=> setDate(dayPicker.value));
+
+  const kzWeekday = ['Жексенбі','Дүйсенбі','Сейсенбі','Сәрсенбі','Бейсенбі','Жұма','Сенбі'];
+  function niceDate(iso){ const {y,m,d} = isoToParts(iso); return kzWeekday[weekdayOf(iso)] + ', ' + d + '.' + String(m).padStart(2,'0') + '.' + y; }
+
+  // ==========================================================================
+  // TABS
+  // ==========================================================================
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      ['daily','monthly','plans','manage'].forEach(t=>{
+        document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab)?'':'none';
+      });
+      if(btn.dataset.tab==='monthly') renderMonthly();
+      if(btn.dataset.tab==='plans') renderPlans();
+      if(btn.dataset.tab==='manage'){ renderManage(); renderUsersList(); }
+    });
+  });
+
+  // ==========================================================================
+  // DAILY TAB
+  // ==========================================================================
+  function renderDaily(){
+    document.getElementById('dailyDateTitle').textContent = niceDate(currentDate);
+    const body = document.getElementById('dailyBody');
+    const hint = document.getElementById('dailyEmptyHint');
+    body.innerHTML = '';
+    hint.style.display = state.projects.length===0 ? '' : 'none';
+
+    const mk = monthKey(currentDate);
+    const dim = daysInMonth(mk);
+
+    state.projects.forEach(proj=>{
+      const key = currentDate+'__'+proj.id;
+      const e = state.entries[key] || {revenue:'', cost:'', problem:''};
+      const revenue = Number(e.revenue)||0;
+      const cost = Number(e.cost)||0;
+      const profit = revenue - cost;
+      const monthlyPlan = getMonthlyPlan(mk, proj.id);
+      const dailyTarget = monthlyPlan > 0 ? (monthlyPlan / dim) : 0;
+      const met = dailyTarget>0 ? profit>=dailyTarget : profit>0;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="proj">${escapeHtml(proj.name)}</td>
+        <td><input type="number" inputmode="decimal" class="inp-revenue" value="${e.revenue||''}" placeholder="0"></td>
+        <td><input type="number" inputmode="decimal" class="inp-cost" value="${e.cost||''}" placeholder="0"></td>
+        <td class="num profit-cell">${fmtMoney(profit)}</td>
+        <td class="num" style="color:var(--ink-soft);" title="Айлық жоспар ${monthlyPlan?fmtMoney(monthlyPlan)+' тг':'орнатылмаған'} ÷ ${dim} күн">${fmtTarget(dailyTarget)}</td>
+        <td><span class="status-pill ${met?'green':'red'}"><span class="dot"></span>${met?'Орындалды':'Орындалмады'}</span></td>
+        <td><textarea class="inp-problem" placeholder="Мәселе / себебі / шешімі">${escapeHtml(e.problem||'')}</textarea></td>
+        <td><button class="del-row" title="Тазалау" data-key="${key}">&times;</button></td>
+      `;
+      body.appendChild(tr);
+
+      const revInp = tr.querySelector('.inp-revenue');
+      const costInp = tr.querySelector('.inp-cost');
+      const probInp = tr.querySelector('.inp-problem');
+      const profitCell = tr.querySelector('.profit-cell');
+      const pill = tr.querySelector('.status-pill');
+
+      function recalc(){
+        const r = Number(revInp.value)||0, c = Number(costInp.value)||0, pr = r-c;
+        profitCell.textContent = fmtMoney(pr);
+        const ok = dailyTarget>0 ? pr>=dailyTarget : pr>0;
+        pill.className = 'status-pill '+(ok?'green':'red');
+        pill.innerHTML = `<span class="dot"></span>${ok?'Орындалды':'Орындалмады'}`;
+      }
+      function persist(){
+        saveEntry(key, { revenue: revInp.value, cost: costInp.value, problem: probInp.value });
+        recalc(); renderDailyKpis();
+      }
+      [revInp,costInp].forEach(inp=> inp.addEventListener('input', persist));
+      probInp.addEventListener('input', persist);
+      tr.querySelector('.del-row').addEventListener('click', ()=>{
+        revInp.value=''; costInp.value=''; probInp.value=''; persist();
+      });
+    });
+    renderDailyKpis();
+  }
+
+  function renderDailyKpis(){
+    const mk = monthKey(currentDate), dim = daysInMonth(mk);
+    let totalRevenue=0, totalCost=0, totalProfit=0, metCount=0, total=0;
+    state.projects.forEach(proj=>{
+      const key = currentDate+'__'+proj.id;
+      const e = state.entries[key] || {};
+      const r = Number(e.revenue)||0, c=Number(e.cost)||0, pr = r-c;
+      const monthlyPlan = getMonthlyPlan(mk, proj.id);
+      const dailyTarget = monthlyPlan > 0 ? (monthlyPlan / dim) : 0;
+      totalRevenue+=r; totalCost+=c; totalProfit+=pr; total++;
+      if(dailyTarget>0 ? pr>=dailyTarget : pr>0) metCount++;
+    });
+    document.getElementById('dailyKpis').innerHTML = `
+      <div class="kpi"><div class="label">Жалпы түсім</div><div class="value num">${fmtMoney(totalRevenue)} тг</div></div>
+      <div class="kpi"><div class="label">Жалпы шығын</div><div class="value num">${fmtMoney(totalCost)} тг</div></div>
+      <div class="kpi"><div class="label">Жалпы таза пайда</div><div class="value num ${totalProfit>=0?'green':'red'}">${fmtMoney(totalProfit)} тг</div></div>
+      <div class="kpi"><div class="label">Жоспар орындалған проект</div><div class="value">${metCount} / ${total}</div></div>
+    `;
+  }
+
+  // ==========================================================================
+  // MONTHLY / PLANS TABS
+  // ==========================================================================
+  function allMonthKeys(){
+    const keys = new Set(FIXED_MONTHS);
+    Object.keys(state.entries).forEach(k=>{ const date = k.split('__')[0]; if(date) keys.add(monthKey(date)); });
+    keys.add(monthKey(currentDate));
+    return Array.from(keys).sort();
+  }
+  function populateSelect(selectEl){
+    const keys = allMonthKeys(); const prev = selectEl.value; const nowKey = todayISO().slice(0,7);
+    selectEl.innerHTML = keys.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
+    if(keys.includes(prev)) selectEl.value = prev;
+    else if(keys.includes(nowKey)) selectEl.value = nowKey;
+    else selectEl.value = keys[0];
+  }
+
+  function renderMonthly(){
+    const sel = document.getElementById('monthPicker');
+    populateSelect(sel);
+    if(!sel._wired){ sel.addEventListener('change', drawMonthly); sel._wired = true; }
+    drawMonthly();
+  }
+
+  function drawMonthly(){
+    const mk = document.getElementById('monthPicker').value;
+    const body = document.getElementById('monthlyBody'); const foot = document.getElementById('monthlyFoot');
+    body.innerHTML=''; foot.innerHTML='';
+    let grandRevenue=0, grandCost=0, grandProfit=0, grandPlan=0;
+
+    state.projects.forEach(proj=>{
+      let revenue=0, cost=0;
+      Object.keys(state.entries).forEach(k=>{
+        const [date, pid] = k.split('__');
+        if(pid===proj.id && monthKey(date)===mk){ const e = state.entries[k]; revenue += Number(e.revenue)||0; cost += Number(e.cost)||0; }
+      });
+      const plan = getMonthlyPlan(mk, proj.id);
+      const profit = revenue-cost;
+      const pct = plan>0 ? Math.round((profit/plan)*100) : (profit>0?100:0);
+      grandRevenue+=revenue; grandCost+=cost; grandProfit+=profit; grandPlan+=plan;
+      const ok = plan>0 ? profit>=plan : profit>0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="proj">${escapeHtml(proj.name)}</td>
+        <td class="num">${fmtMoney(revenue)} тг</td>
+        <td class="num">${fmtMoney(cost)} тг</td>
+        <td class="num" style="color:${profit>=0?'var(--green)':'var(--red)'};font-weight:700;">${fmtMoney(profit)} тг</td>
+        <td class="num">${fmtMoney(plan)} тг</td>
+        <td><span class="status-pill ${ok?'green':'red'}"><span class="dot"></span>${pct}%</span></td>
+      `;
+      body.appendChild(tr);
+    });
+
+    const trTotal = document.createElement('tr'); trTotal.className='totals-row';
+    trTotal.innerHTML = `
+      <td>Барлығы</td>
+      <td class="num">${fmtMoney(grandRevenue)} тг</td>
+      <td class="num">${fmtMoney(grandCost)} тг</td>
+      <td class="num" style="color:${grandProfit>=0?'var(--green)':'var(--red)'};">${fmtMoney(grandProfit)} тг</td>
+      <td class="num">${fmtMoney(grandPlan)} тг</td>
+      <td>${grandPlan>0?Math.round((grandProfit/grandPlan)*100):0}%</td>
+    `;
+    foot.appendChild(trTotal);
+
+    document.getElementById('monthlyKpis').innerHTML = `
+      <div class="kpi"><div class="label">${monthLabel(mk)} — жалпы түсім</div><div class="value num">${fmtMoney(grandRevenue)} тг</div></div>
+      <div class="kpi"><div class="label">Жалпы шығын</div><div class="value num">${fmtMoney(grandCost)} тг</div></div>
+      <div class="kpi"><div class="label">Жалпы таза пайда</div><div class="value num ${grandProfit>=0?'green':'red'}">${fmtMoney(grandProfit)} тг</div></div>
+      <div class="kpi"><div class="label">Жоспар орындалуы</div><div class="value">${grandPlan>0?Math.round((grandProfit/grandPlan)*100):0}%</div></div>
+    `;
+  }
+
+  function renderPlans(){
+    const sel = document.getElementById('plansMonthPicker');
+    populateSelect(sel);
+    if(!sel._wired){ sel.addEventListener('change', drawPlans); sel._wired = true; }
+    drawPlans();
+  }
+
+  function drawPlans(){
+    const mk = document.getElementById('plansMonthPicker').value;
+    const body = document.getElementById('plansBody');
+    const hint = document.getElementById('plansEmptyHint');
+    const note = document.getElementById('plansNoPermNote');
+    body.innerHTML = '';
+    hint.style.display = state.projects.length===0 ? '' : 'none';
+    note.style.display = isAdmin ? 'none' : '';
+    const dim = daysInMonth(mk);
+
+    state.projects.forEach(proj=>{
+      const plan = getMonthlyPlan(mk, proj.id);
+      const daily = plan>0 ? (plan/dim) : 0;
+      const tr = document.createElement('tr');
+
+      if (!isAdmin){
+        tr.innerHTML = `
+          <td class="proj">${escapeHtml(proj.name)}</td>
+          <td class="num">${plan ? fmtMoney(plan)+' тг' : '—'}</td>
+          <td class="num" style="color:var(--ink-soft);">${fmtTarget(daily)}</td>
+        `;
+        body.appendChild(tr); return;
+      }
+
+      tr.innerHTML = `
+        <td class="proj">${escapeHtml(proj.name)}</td>
+        <td><input type="number" inputmode="decimal" class="inp-monthplan" value="${plan||''}" placeholder="0"></td>
+        <td class="num daily-target" style="color:var(--ink-soft);">${fmtTarget(daily)}</td>
+      `;
+      body.appendChild(tr);
+      const planInp = tr.querySelector('.inp-monthplan');
+      const dailyCell = tr.querySelector('.daily-target');
+      let t = null;
+      planInp.addEventListener('input', ()=>{
+        const v = Number(planInp.value)||0;
+        dailyCell.textContent = fmtTarget(v ? v/dim : 0);
+        clearTimeout(t);
+        t = setTimeout(()=> setMonthlyPlan(mk, proj.id, planInp.value), 500);
+      });
+    });
+  }
+
+  // ==========================================================================
+  // MANAGE — PROJECTS
+  // ==========================================================================
+  function renderManage(){
+    const body = document.getElementById('manageBody');
+    const hint = document.getElementById('manageEmptyHint');
+    const addBox = document.querySelector('.addproj');
+    if (addBox) addBox.style.display = isAdmin ? '' : 'none';
+    body.innerHTML=''; hint.style.display = state.projects.length===0 ? '' : 'none';
+
+    state.projects.forEach(p=>{
+      const tr = document.createElement('tr');
+      if (!isAdmin){ tr.innerHTML = `<td>${escapeHtml(p.name)}</td><td></td>`; body.appendChild(tr); return; }
+      tr.innerHTML = `<td>${escapeHtml(p.name)}</td><td><button class="del-row" data-id="${p.id}" title="Өшіру">&times;</button></td>`;
+      const btn = tr.querySelector('.del-row');
+      let armed=false, armTimer=null;
+      btn.addEventListener('click', async ()=>{
+        if(!armed){
+          armed=true; btn.textContent='Растау'; btn.style.fontSize='12px'; btn.style.color='var(--red)'; btn.style.fontWeight='700';
+          clearTimeout(armTimer);
+          armTimer=setTimeout(()=>{ armed=false; btn.innerHTML='&times;'; btn.style.fontSize=''; btn.style.fontWeight=''; }, 2500);
+          return;
+        }
+        clearTimeout(armTimer);
+        await deleteProject(p.id); renderManage(); renderDaily();
+      });
+      body.appendChild(tr);
+    });
+  }
+
+  document.getElementById('addProjBtn').addEventListener('click', async ()=>{
+    if (!isAdmin) return;
+    const inp = document.getElementById('newProjName');
+    const name = inp.value.trim();
+    if(!name) return;
+    await addProject(name); inp.value=''; renderManage(); renderDaily();
+  });
+  document.getElementById('newProjName').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('addProjBtn').click(); });
+
+  // ==========================================================================
+  // MANAGE — USERS & ROLES (Supabase-те бұл әлдеқайда қарапайым: тіркелген
+  // барлық адам users кестесінде бар — Claude нұсқасындағы "іздеу" мен
+  // "кіріп көрген адамдар" күрделілігі мүлде қажет емес)
+  // ==========================================================================
+  async function renderUsersList(){
+    const card = document.querySelectorAll('#tab-manage .card')[1];
+    if (card) card.style.display = isAdmin ? '' : 'none';
+    if (!isAdmin) return;
+
+    const body = document.getElementById('usersBody');
+    const hint = document.getElementById('usersEmptyHint');
+    const { data: users } = await supabase.from('users').select('*').order('email');
+    body.innerHTML = '';
+    hint.style.display = (!users || users.length===0) ? '' : 'none';
+
+    (users||[]).forEach(u=>{
+      const tr = document.createElement('tr');
+      const isMe = u.id === myId;
+      tr.innerHTML = `
+        <td>${escapeHtml(u.name || u.email)}${isMe ? ' <span style="color:var(--ink-soft);font-size:12px;">(сіз)</span>' : ''}</td>
+        <td><span class="status-pill ${u.role==='rom'?'green':'red'}"><span class="dot"></span>${u.role==='rom'?'РОМ':'Мидл'}</span></td>
+        <td><button class="mini-toggle" data-id="${u.id}" data-role="${u.role}" style="font-family:inherit;font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink-soft);cursor:pointer;">${u.role==='rom' ? 'Мидл ету' : 'РОМ ету'}</button></td>
+      `;
+      tr.querySelector('.mini-toggle').addEventListener('click', async ()=>{
+        const newRole = u.role==='rom' ? 'midl' : 'rom';
+        await setUserRole(u.id, newRole);
+        renderUsersList();
+      });
+      body.appendChild(tr);
+    });
+  }
+
+})();
+</script>
+</body>
+</html>

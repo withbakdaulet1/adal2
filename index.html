@@ -489,7 +489,9 @@
   let session = null;
   let myId = null;
   let isAdmin = false;
-  let saveTimer = null;
+  let saveTimers = {}; // key -> timeoutId — әр жолдың (project+date) өз таймері болуы керек,
+                        // бір ортақ таймер болса, бір жолда жазған кезде екінші жолдың
+                        // сақталуы үзіліп қалады (clearTimeout бәрін өшіріп тастайды)
 
   // ==========================================================================
   // AUTH
@@ -645,16 +647,36 @@
     setTimeout(()=>{ if(el.className==='save-note saved'){ el.textContent='\u00A0'; el.className='save-note'; } }, 1800);
   }
 
+  async function flushEntry(key){
+    clearTimeout(saveTimers[key]);
+    delete saveTimers[key];
+    const data = state.entries[key];
+    if (!data) return;
+    const [date, projectId] = key.split('__');
+    await supabase.from('entries').upsert(
+      { date, project_id: projectId, revenue: Number(data.revenue)||0, cost: Number(data.cost)||0, issue: data.issue||'', reason: data.reason||'', decision: data.decision||'' },
+      { onConflict: 'date,project_id' }
+    );
+    markSaved();
+  }
+
+  // Беттен кетер алдында сақталмай қалған өзгерістерді мәжбүрлеп жіберу
+  window.addEventListener('pagehide', ()=>{ Object.keys(saveTimers).forEach(k=> flushEntry(k)); });
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'hidden') Object.keys(saveTimers).forEach(k=> flushEntry(k));
+  });
+
   async function saveEntry(key, data){
     state.entries[key] = data;
     markSaving();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(async ()=>{
+    clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(async ()=>{
       const [date, projectId] = key.split('__');
       await supabase.from('entries').upsert(
         { date, project_id: projectId, revenue: Number(data.revenue)||0, cost: Number(data.cost)||0, issue: data.issue||'', reason: data.reason||'', decision: data.decision||'' },
         { onConflict: 'date,project_id' }
       );
+      delete saveTimers[key];
       markSaved();
     }, 500);
   }
@@ -947,8 +969,10 @@
         saveEntry(key, { revenue: revInp.value, cost: costInp.value, issue: issueInp.value, reason: reasonInp.value, decision: decisionInp.value });
         recalc(); renderDailyKpis();
       }
-      [revInp,costInp].forEach(inp=> inp.addEventListener('input', persist));
-      [issueInp,reasonInp,decisionInp].forEach(inp=> inp.addEventListener('input', persist));
+      [revInp,costInp,issueInp,reasonInp,decisionInp].forEach(inp=> inp.addEventListener('input', persist));
+      // Өрістен шыққанда (blur) — пернетақта таймерін күтпей бірден сақтау, осылайша
+      // адам жазып болып бірден басқа жолға не беттен кетсе де деректер жоғалмайды
+      [revInp,costInp,issueInp,reasonInp,decisionInp].forEach(inp=> inp.addEventListener('blur', ()=> flushEntry(key)));
       tr.querySelector('.del-row').addEventListener('click', ()=>{
         revInp.value=''; costInp.value=''; issueInp.value=''; reasonInp.value=''; decisionInp.value=''; persist();
       });
